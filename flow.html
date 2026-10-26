@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V-Run · App Flow & Architecture</title>
+<style>
+  :root {
+    --bg: #0b1020; --surface: #131b31; --surface-2: #19223d; --border: #2a3760; --ink: #eef2ff; --ink-2: #b4bdd6;
+    --muted: #8790ad; --green: #22c55e; --cyan: #06b6d4; --amber: #f59e0b; --violet: #8b5cf6; --pink: #ec4899;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; }
+  main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 2.2rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  h1 span { background: linear-gradient(135deg, var(--green), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h2 { font-size: 1.4rem; margin: 48px 0 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 0 0 6px; }
+  p.lead { color: var(--ink-2); max-width: 760px; }
+  .muted { color: var(--muted); }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 0.86em; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; color: #a5f3fc; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  nav.toc a { color: var(--ink-2); text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); font-size: 0.875rem; }
+  nav.toc a:hover { border-color: var(--green); color: var(--ink); }
+
+  /* Flow nodes */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 18px 0; }
+  .node { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; min-width: 150px; flex: 1; position: relative; }
+  .node h4 { margin: 0 0 4px; font-size: 0.95rem; }
+  .node p { margin: 0; font-size: 0.82rem; color: var(--ink-2); }
+  .node .tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .arrow { display: flex; align-items: center; justify-content: center; width: 34px; color: var(--muted); font-size: 1.3rem; flex: 0 0 34px; }
+  .start { border-color: var(--green); box-shadow: inset 4px 0 0 var(--green); }
+  .decision { border-color: var(--amber); box-shadow: inset 4px 0 0 var(--amber); }
+  .ext { border-style: dashed; border-color: var(--cyan); }
+  .fallback { border-color: var(--pink); box-shadow: inset 4px 0 0 var(--pink); }
+
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 0.9rem; }
+  .card li { margin: 3px 0; }
+
+  /* Screen map */
+  .screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; }
+  .screen { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .screen .route { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; color: var(--green); }
+  .screen ul { margin: 6px 0 0; padding-left: 16px; font-size: 0.84rem; color: var(--ink-2); }
+
+  /* Architecture */
+  .arch { display: grid; grid-template-columns: 1fr 60px 1.4fr 60px 1fr; align-items: center; margin-top: 18px; }
+  .tier { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px; }
+  .tier > h3 { display: flex; align-items: center; gap: 8px; }
+  .tier .box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-top: 8px; font-size: 0.84rem; }
+  .tier .box b { color: var(--ink); }
+  .tier .box span { color: var(--muted); }
+  .wire { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); font-size: 0.72rem; text-align: center; gap: 4px; }
+  .wire::before { content: '⇄'; font-size: 1.6rem; color: var(--cyan); }
+  .ext-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; background: var(--surface); }
+  td code { white-space: nowrap; }
+  .m { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: 0.78rem; padding: 2px 6px; border-radius: 6px; }
+  .GET { color: #86efac; background: rgba(34,197,94,0.12); }
+  .POST { color: #93c5fd; background: rgba(59,130,246,0.14); }
+  .PATCH { color: #fcd34d; background: rgba(245,158,11,0.14); }
+
+  .er { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .entity { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .entity h4 { margin: 0; padding: 10px 14px; background: var(--surface-2); font-family: ui-monospace, Consolas, monospace; font-size: 0.9rem; color: var(--green); }
+  .entity ul { list-style: none; margin: 0; padding: 8px 14px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 0.78rem; color: var(--ink-2); }
+  .entity li { padding: 2px 0; }
+  .pk { color: var(--amber); }
+  .fk { color: var(--cyan); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 2px solid; }
+
+  @media (max-width: 900px) {
+    .g3, .g4, .er { grid-template-columns: 1fr 1fr; }
+    .arch { grid-template-columns: 1fr; }
+    .wire { padding: 8px 0; }
+    .wire::before { content: '⇅'; }
+    .flow { flex-direction: column; }
+    .arrow { width: 100%; height: 28px; flex-basis: 28px; }
+    .arrow.r::after { content: ''; }
+  }
+  @media (max-width: 560px) { .g2, .g3, .g4, .er, .ext-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>V-Run</span> · App Flow &amp; Architecture</h1>
+  <p class="lead">
+    V-Run is a free web app that turns walking into a game. It syncs daily steps from Google Fit, or from a
+    built-in sample month when Google Fit isn’t available. On top of those steps it runs 10K-a-day streaks, a
+    plant that grows as you walk, 60-day team contests, individual and team rankings, and a streak-based reward chart.
+  </p>
+  <nav class="toc">
+    <a href="#journey">1 · User journey</a>
+    <a href="#sync">2 · Step sync &amp; fallback</a>
+    <a href="#screens">3 · Screens</a>
+    <a href="#contest">4 · Contest &amp; team flow</a>
+    <a href="#rules">5 · Game rules</a>
+    <a href="#arch">6 · Architecture</a>
+    <a href="#data">7 · Data model</a>
+    <a href="#api">8 · API</a>
+    <a href="#deploy">9 · Run &amp; deploy</a>
+  </nav>
+
+  <!-- 1 -->
+  <h2 id="journey">1 · User journey</h2>
+  <p class="muted">From first visit to a daily habit.</p>
+  <div class="flow">
+    <div class="node start"><span class="tag">Start</span><h4>Landing page</h4><p>Pitch, features, “Start free”</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Auth</span><h4>Sign up / Log in</h4><p>Name, email, password → JWT (7 days)</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Auto</span><h4>First sync</h4><p>Dashboard syncs if last sync &gt; 10 min ago</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Home</span><h4>Today dashboard</h4><p>Progress ring, plant, streak, garden, contest card</p></div>
+  </div>
+  <div class="flow">
+    <div class="node decision"><span class="tag">Optional</span><h4>Profile → Connect Google Fit</h4><p>OAuth consent, read-only activity scope</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Engage</span><h4>Join 60-day contest</h4><p>Create a team or join one with an invite code</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Compete</span><h4>Rankings</h4><p>Individual &amp; team standings, global leaderboard</p></div>
+    <div class="arrow">→</div>
+    <div class="node start"><span class="tag">Habit loop</span><h4>Come back daily</h4><p>Keep the streak, grow trees, unlock rewards</p></div>
+  </div>
+
+  <!-- 2 -->
+  <h2 id="sync">2 · Step sync &amp; fallback</h2>
+  <p class="muted">
+    Runs on <code>POST /api/steps/sync</code>, whether triggered automatically by the dashboard, by the Sync button,
+    or right after the Google OAuth callback.
+  </p>
+  <div class="flow">
+    <div class="node start"><span class="tag">Trigger</span><h4>Sync requested</h4><p>Auto (10 min), button, or OAuth callback</p></div>
+    <div class="arrow">→</div>
+    <div class="node decision"><span class="tag">Decision</span><h4>Google tokens saved and server configured?</h4><p>Checks <code>google_tokens</code> and the env credentials</p></div>
+    <div class="arrow">→</div>
+    <div class="node ext"><span class="tag">Yes · Google</span><h4>Refresh token if expired</h4><p><code>oauth2.googleapis.com/token</code></p></div>
+    <div class="arrow">→</div>
+    <div class="node ext"><span class="tag">Yes · Google</span><h4>Fitness aggregate</h4><p>30 daily buckets of <code>step_count.delta</code> (estimated_steps)</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Store</span><h4>Upsert as <code>google_fit</code></h4><p>Overwrites earlier values for each day</p></div>
+  </div>
+  <div class="flow">
+    <div class="node fallback"><span class="tag">No · or any error</span><h4>Load fallback month</h4><p><code>server/data/fallback-steps.json</code> (30 days)</p></div>
+    <div class="arrow">→</div>
+    <div class="node fallback"><span class="tag">Map</span><h4>Re-date to last 30 days</h4><p>Last entry = today, scaled by time of day; 0–12% per-user variation</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Store</span><h4>Upsert as <code>demo</code></h4><p>Never overwrites real <code>google_fit</code> rows</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">UI</span><h4>“Demo data” badge</h4><p>Banner nudges the user to connect Google Fit</p></div>
+  </div>
+  <div class="card">
+    <h3>⚠️ Google Fit status (researched Oct 2026)</h3>
+    <ul>
+      <li>Google stopped accepting new Google Fit API sign-ups on <b>1 May 2024</b> and is retiring the Fit APIs during 2026. No exact shutdown day has been published.</li>
+      <li>V-Run still includes the complete OAuth + REST integration. If you have existing Fitness API access, add the credentials to <code>server/.env</code> and it works.</li>
+      <li>Without credentials, or if Google errors, V-Run falls back to the sample month automatically, so the app never breaks.</li>
+      <li>Planned migration paths: <b>Health Connect</b> (Android, on-device) or the <b>Google Health API</b>. Only <code>server/src/services/googleFit.js</code> needs replacing; everything else reads from <code>daily_steps</code>.</li>
+    </ul>
+  </div>
+
+  <!-- 3 -->
+  <h2 id="screens">3 · Screens</h2>
+  <div class="screens">
+    <div class="screen"><div class="route">/</div><h3>Landing</h3><ul><li>Hero with blooming plant</li><li>6 feature cards</li><li>CTA to sign up</li></ul></div>
+    <div class="screen"><div class="route">/signup · /login</div><h3>Auth</h3><ul><li>Validated forms</li><li>Rate-limited API</li><li>Redirects back to the page you came from</li></ul></div>
+    <div class="screen"><div class="route">/dashboard</div><h3>Today</h3><ul><li>Progress ring and a message that changes with progress</li><li>Plant growth (6 stages)</li><li>Streak, coins, 10K days</li><li>Week chart and 30-day garden</li><li>Streak-at-risk alert, confetti at 10K</li></ul></div>
+    <div class="screen"><div class="route">/history</div><h3>History</h3><ul><li>7 / 30 / 60 / 90 days</li><li>Bar chart with goal line and tooltips</li><li>Table view</li><li>Calendar heatmap</li></ul></div>
+    <div class="screen"><div class="route">/contests</div><h3>Contests</h3><ul><li>Live / upcoming / finished</li><li>Join for free</li><li>Create a 60-day contest</li></ul></div>
+    <div class="screen"><div class="route">/contests/:id</div><h3>Contest detail</h3><ul><li>Team ranking (avg per member)</li><li>Individual ranking and podium</li><li>Create or join a team, invite code</li><li>Leave team or contest</li></ul></div>
+    <div class="screen"><div class="route">/leaderboard</div><h3>Global ranks</h3><ul><li>Week / 30 days / all time</li><li>Your rank and steps needed to pass the next walker</li></ul></div>
+    <div class="screen"><div class="route">/rewards</div><h3>Rewards</h3><ul><li>Streak reward chart (3 → 60 days)</li><li>Step badges</li><li>V-Coins explainer</li></ul></div>
+    <div class="screen"><div class="route">/profile</div><h3>Profile</h3><ul><li>Connect or disconnect Google Fit</li><li>Daily goal slider</li><li>Name, log out</li></ul></div>
+  </div>
+
+  <!-- 4 -->
+  <h2 id="contest">4 · Contest &amp; team flow</h2>
+  <div class="flow">
+    <div class="node start"><span class="tag">Browse</span><h4>Contests list</h4><p>Default “V-Run 60 Day Challenge” is created automatically</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Join</span><h4>Join contest</h4><p>Free; blocked once the contest has finished</p></div>
+    <div class="arrow">→</div>
+    <div class="node decision"><span class="tag">Choose</span><h4>Team?</h4><p>Create one (you become captain) · join with a 6-character code · join from the ranking list · or walk solo</p></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="tag">Compete</span><h4>Steps from start date to today count</h4><p>Individuals: total steps · Teams: average per member</p></div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>Team rules</h3><ul><li>Maximum 10 members</li><li>One team per walker per contest</li><li>Joining is transactional (<code>SELECT … FOR UPDATE</code>) so teams can’t overfill</li></ul></div>
+    <div class="card"><h3>Leaving</h3><ul><li>If the captain leaves, the earliest remaining member becomes captain</li><li>When the last member leaves, the team is deleted</li><li>Leaving a contest also leaves your team</li></ul></div>
+    <div class="card"><h3>Lifecycle</h3><ul><li><b>Upcoming</b>: start date is in the future</li><li><b>Active</b>: day N of 60</li><li><b>Finished</b>: read-only standings</li></ul></div>
+  </div>
+
+  <!-- 5 -->
+  <h2 id="rules">5 · Game rules</h2>
+  <div class="grid g4">
+    <div class="card"><h3>🔥 Streak</h3><ul><li>Consecutive days at or above your goal (default 10,000)</li><li>Today doesn’t break the streak while the day is still in progress</li><li>The longest streak is tracked separately</li></ul></div>
+    <div class="card"><h3>🌱 Plant</h3><ul><li>Six stages: seed → sprout → seedling → sapling → young tree → bloom</li><li>A new stage roughly every 25% of the goal</li><li>Each goal day adds a tree to the 30-day garden</li></ul></div>
+    <div class="card"><h3>🪙 V-Coins</h3><ul><li>1 coin per 1,000 steps (max 25 a day)</li><li>+10 for each goal day</li><li>Milestone bonuses: 3d +30, 7d +75, 14d +150, 21d +250, 30d +400, 45d +600, 60d +1000</li></ul></div>
+    <div class="card"><h3>🏅 Badges</h3><ul><li>Single day: 10K, 15K, 20K</li><li>Lifetime: 100K, 250K, 500K, 1M</li><li>Everything is free; there’s no paywall</li></ul></div>
+  </div>
+
+  <!-- 6 -->
+  <h2 id="arch">6 · Architecture</h2>
+  <div class="arch">
+    <div class="tier">
+      <h3>🖥️ Browser</h3>
+      <div class="box"><b>React 18 SPA</b> <span>(Vite)</span></div>
+      <div class="box"><b>react-router</b> <span>protected routes</span></div>
+      <div class="box"><b>AuthContext</b> <span>JWT in localStorage</span></div>
+      <div class="box"><b>Hand-built SVG</b> <span>ring, plant, charts</span></div>
+    </div>
+    <div class="wire">HTTPS<br/>JSON /api</div>
+    <div class="tier">
+      <h3>⚙️ Node.js API (Express 4)</h3>
+      <div class="box"><b>Middleware</b> <span>helmet · CORS · rate-limit · JSON 100kb · JWT auth</span></div>
+      <div class="box"><b>Routes</b> <span>auth · steps · googlefit · contests/teams · leaderboard</span></div>
+      <div class="box"><b>Services</b> <span>stats (streaks, coins, rewards) · sync · googleFit</span></div>
+      <div class="box"><b>Startup</b> <span>auto-creates the database and tables, seeds the default contest</span></div>
+      <div class="box"><b>Production</b> <span>serves <code>client/dist</code> on the same origin</span></div>
+    </div>
+    <div class="wire">mysql2<br/>pool</div>
+    <div class="tier">
+      <h3>🗄️ MySQL 8</h3>
+      <div class="box"><b>users</b></div>
+      <div class="box"><b>daily_steps</b></div>
+      <div class="box"><b>google_tokens</b></div>
+      <div class="box"><b>contests · teams</b></div>
+      <div class="box"><b>contest_participants</b></div>
+    </div>
+  </div>
+  <div class="ext-row">
+    <div class="node ext"><span class="tag">External · optional</span><h4>Google OAuth 2.0</h4><p>Auth-code flow with offline access. A signed, 10-minute <code>state</code> JWT links the callback to the user and blocks CSRF.</p></div>
+    <div class="node fallback"><span class="tag">Built-in</span><h4>Fallback JSON</h4><p><code>server/data/fallback-steps.json</code> keeps the app working whenever Google is unavailable.</p></div>
+  </div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card"><h3>Security</h3><ul><li>bcrypt password hashes (cost 10)</li><li>Every SQL query is parameterised</li><li>Rate limits on auth and sync</li><li>Helmet headers; CORS limited to <code>CLIENT_URL</code></li><li>Production refuses to start without a strong <code>JWT_SECRET</code></li></ul></div>
+    <div class="card"><h3>Reliability</h3><ul><li>Automatic fallback when Google fails</li><li>Transactions for team changes</li><li>Health check at <code>/api/health</code></li><li>Graceful shutdown that closes the DB pool</li></ul></div>
+    <div class="card"><h3>Folder layout</h3><ul><li><code>client/</code>: React app (pages, components, context)</li><li><code>server/src/routes</code>: HTTP layer</li><li><code>server/src/services</code>: business logic</li><li><code>server/data</code>: fallback month</li></ul></div>
+  </div>
+
+  <!-- 7 -->
+  <h2 id="data">7 · Data model</h2>
+  <div class="legend"><span><i style="border-color:var(--amber)"></i>primary key</span><span><i style="border-color:var(--cyan)"></i>foreign key</span></div>
+  <div class="er">
+    <div class="entity"><h4>users</h4><ul><li class="pk">id PK</li><li>name, email (unique)</li><li>password_hash</li><li>daily_goal (10000)</li><li>avatar_color</li><li>data_source none|google_fit|demo</li><li>last_synced_at, created_at</li></ul></div>
+    <div class="entity"><h4>daily_steps</h4><ul><li class="pk">(user_id, step_date) PK</li><li class="fk">user_id → users</li><li>steps</li><li>source google_fit|demo</li><li>updated_at</li></ul></div>
+    <div class="entity"><h4>google_tokens</h4><ul><li class="pk fk">user_id PK → users</li><li>access_token</li><li>refresh_token</li><li>expires_at (ms)</li></ul></div>
+    <div class="entity"><h4>contests</h4><ul><li class="pk">id PK</li><li>name, description</li><li>start_date, end_date (+59 days)</li><li>max_team_size (10)</li><li class="fk">created_by → users</li></ul></div>
+    <div class="entity"><h4>teams</h4><ul><li class="pk">id PK</li><li class="fk">contest_id → contests</li><li>name (unique per contest)</li><li>invite_code (unique)</li><li class="fk">captain_id → users</li></ul></div>
+    <div class="entity"><h4>contest_participants</h4><ul><li class="pk">(contest_id, user_id) PK</li><li class="fk">team_id → teams (nullable)</li><li>joined_at</li></ul></div>
+  </div>
+
+  <!-- 8 -->
+  <h2 id="api">8 · API</h2>
+  <p class="muted">Every route except signup, login, health and the OAuth callback needs <code>Authorization: Bearer &lt;jwt&gt;</code>.</p>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/health</code></td><td>Liveness, DB status, Google Fit mode</td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/auth/signup</code> · <code>/login</code></td><td>Create an account or log in, returns <code>{ token, user }</code></td></tr>
+      <tr><td><span class="m GET">GET</span> <span class="m PATCH">PATCH</span></td><td><code>/api/auth/me</code></td><td>Current user; update name or daily goal</td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/steps/sync</code></td><td>Google Fit sync, falling back to the sample month</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/steps/summary</code></td><td>Today, streaks, coins, week, 30-day garden</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/steps/history?days=7|30|60|90</code></td><td>Gap-filled daily series and stats</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/steps/rewards</code></td><td>Streak milestones, badges, next reward</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/googlefit/status</code> · <code>/auth-url</code></td><td>Connection state; Google consent URL</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/googlefit/callback</code></td><td>OAuth redirect: saves tokens, syncs, redirects to <code>/profile?fit=…</code></td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/googlefit/disconnect</code></td><td>Revokes and deletes tokens</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/leaderboard?period=7|30|all</code></td><td>Global ranking with your position</td></tr>
+      <tr><td><span class="m GET">GET</span> <span class="m POST">POST</span></td><td><code>/api/contests</code></td><td>List contests; create a 60-day contest</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/contests/:id</code></td><td>Detail, whether you’ve joined, your team and invite code</td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/contests/:id/join</code> · <code>/leave</code></td><td>Join or leave a contest</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/contests/:id/leaderboard/individual</code> · <code>/teams</code></td><td>Contest rankings</td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/contests/:id/teams</code></td><td>Create a team (you become captain)</td></tr>
+      <tr><td><span class="m POST">POST</span></td><td><code>/api/contests/:id/teams/join</code> · <code>/leave</code></td><td>Join with <code>{code}</code> or <code>{teamId}</code>; leave your team</td></tr>
+      <tr><td><span class="m GET">GET</span></td><td><code>/api/contests/:id/teams/:teamId</code></td><td>Team members and steps (members also see the invite code)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 9 -->
+  <h2 id="deploy">9 · Run &amp; deploy</h2>
+  <div class="grid g2">
+    <div class="card"><h3>Local development</h3><ul>
+      <li><code>npm run install:all</code></li>
+      <li>Edit <code>server/.env</code> (MySQL credentials)</li>
+      <li><code>npm run seed</code> (optional demo walkers and teams)</li>
+      <li><code>npm run dev</code> → web on <code>:5173</code>, API on <code>:5050</code></li>
+    </ul></div>
+    <div class="card"><h3>Production (single process)</h3><ul>
+      <li><code>npm run build</code> (outputs <code>client/dist</code>)</li>
+      <li>Set <code>NODE_ENV=production</code>, a strong <code>JWT_SECRET</code>, <code>CLIENT_URL</code> = public URL</li>
+      <li><code>npm start</code>: Express serves the API and the SPA on one port</li>
+      <li>Put it behind HTTPS (nginx, Caddy, or a PaaS)</li>
+    </ul></div>
+  </div>
+</main>
+</body>
+</html>
